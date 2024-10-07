@@ -10,6 +10,8 @@
 #include <chrono>
 #include <conio.h>
 
+constexpr bool colvariety = true;
+
 struct ConsoleColor {
     int r, g, b;
 
@@ -36,7 +38,7 @@ std::vector<ConsoleColor> GetConsoleColors() {
 
         ConsoleColor color;
         color.r = GetBValue(colorRef);
-        color.g = GetGValue(colorRef) * 0.9;
+        color.g = GetGValue(colorRef);
         color.b = GetRValue(colorRef);
 
         consoleColors.push_back(color);
@@ -154,19 +156,35 @@ std::wstring textColor(int colorCode) {
     }
 }
 
+ConsoleColor* BGCOL = nullptr;
 std::wstring gifBuffer = L"";
 void addToBuffer(int x, int y, const ConsoleColor& color) {
 
-    auto colorCodeIterator = colors.find(color);
-    int c = (colorCodeIterator != colors.end()) ? colorCodeIterator->second : -1;
+    if (colvariety) {
+        //std::cout << color.r << " " << color.g << " " << color.b << std::endl;
+        //66 115 8 BG
+        if (BGCOL) {
+            if (color == *BGCOL) {
+                gifBuffer += L"  ";
+                return;
+            }
 
-    if (c == -1) {
-        bg = true;
+            gifBuffer += L"\x1b[38;2;" + std::to_wstring(color.r) + L";" + std::to_wstring(color.g) + L";" + std::to_wstring(color.b) + L"m██";
+        }
+    } else {
+
+        auto colorCodeIterator = colors.find(color);
+        int c = (colorCodeIterator != colors.end()) ? colorCodeIterator->second : -1;
+
+        if (c == -1) {
+            bg = true;
+        }
+
+        gifBuffer += (bg ? L"  " : L"\033[0m" + textColor(c));
+
+        bg = false;
+
     }
-
-    gifBuffer += (bg ? L"  " : L"\033[0m" + textColor(c));
-
-    bg = false;
 }
 
 void renderBuffer() {
@@ -186,9 +204,20 @@ void HideConsoleCursor() {
     SetConsoleCursorInfo(hConsole, &cursorInfo);
 }
 
+
 void renderGifFrame(gd_GIF*& gif, uint8_t*& frame_buffer) {
     gd_render_frame(gif, frame_buffer);
     gifBuffer.clear();
+
+    if (colvariety) {
+        if (!BGCOL) {
+            BGCOL = new ConsoleColor();
+        }
+        int bgind = gif->bgindex * 3;
+        BGCOL->r = frame_buffer[bgind];
+        BGCOL->g = frame_buffer[bgind + 1];
+        BGCOL->b = frame_buffer[bgind + 2];
+    }
 
     for (int y = 0; y < gif->height; y++) {
         for (int x = 0; x < gif->width; x++) {
@@ -221,22 +250,25 @@ void animationRenderGif(const std::string& currentgif) {
         return;
     }
 
-    for (int i = 0; i < 768; i += 3) {
-        ConsoleColor color = {
-            gif->palette->colors[i + 0],
-            gif->palette->colors[i + 1],
-            gif->palette->colors[i + 2]
-        };
+    if (!colvariety) {
+        for (int i = 0; i < 768; i += 3) {
+            ConsoleColor color = {
+                gif->palette->colors[i + 0],
+                gif->palette->colors[i + 1],
+                gif->palette->colors[i + 2]
+            };
 
-        uint8_t c[3];
-        c[0] = color.r;
-        c[1] = color.g;
-        c[2] = color.b;
+            uint8_t c[3];
+            c[0] = color.r;
+            c[1] = color.g;
+            c[2] = color.b;
 
-        if (gd_is_bgcolor(gif, c)) {
-            colors[color] = -1;
-        } else {
-            colors[color] = consoleColorToNumeral(color);
+            if (gd_is_bgcolor(gif, c)) {
+                colors[color] = -1;
+            }
+            else {
+                colors[color] = consoleColorToNumeral(color);
+            }
         }
     }
 
@@ -275,7 +307,7 @@ void animationRenderGif(const std::string& currentgif) {
 int main() {
     consoleColors = GetConsoleColors();
     std::string path = "C:\\Users\\Tom\\Desktop\\OUT\\";
-    std::string name = "Chandelure\\";
+    std::string name = "Rayquaza\\";
     bool shiny = 1;
     bool front = 1;
     std::string rest = (std::string)(shiny ? "Shiny\\" : "NonShiny\\") + (front ? "Front.gif" : "Back.gif");
